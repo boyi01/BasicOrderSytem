@@ -8,7 +8,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const PORT = 3000;
+const PORT = 3001;
 
 // Artikel laden
 const articles = JSON.parse(fs.readFileSync(path.join(__dirname, 'articles.json')));
@@ -82,15 +82,16 @@ io.on('connection', (socket) => {
     console.log(`Order ${orderId} wurde geschlossen.`);
 
     // Nach 5 Sekunden aus Liste entfernen (statt 10)
-    setTimeout(() => {
-      const stillExists = orders[orderIndex];
-      if (stillExists && stillExists.closed) {
-        orders.splice(orderIndex, 1);
-        broadcastState();
-        console.log(`Order ${orderId} wurde automatisch entfernt.`);
-      }
-    }, 5000);
+    
+    const stillExists = orders[orderIndex];
+    if (stillExists && stillExists.closed) {
+      orders.splice(orderIndex, 1);
+      broadcastState();
+      console.log(`Order ${orderId} wurde automatisch entfernt.`);
+    }
   }
+
+  
 });
 
   function broadcastState() {
