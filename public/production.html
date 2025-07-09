@@ -1,0 +1,201 @@
+<!DOCTYPE html> 
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Production</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+  <style>
+    /* Reset & Basis */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f2f5;
+      margin: 0;
+      padding: 1rem;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      user-select: none;
+      touch-action: manipulation;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 1rem;
+    }
+
+    ul#orderList {
+      list-style: none;
+      padding: 0;
+      margin: 0 auto;
+      max-width: 600px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    ul#orderList li {
+      background: white;
+      padding: 16px 24px;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgb(0 0 0 / 0.1);
+      font-size: 1.25rem;
+      color: #222;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      transition: background-color 0.25s ease, box-shadow 0.25s ease;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      overflow: hidden;
+      position: relative;
+    }
+
+    ul#orderList li.closed {
+      text-decoration: line-through;
+      color: #999;
+      cursor: default;
+      background: #e6e6e6;
+      box-shadow: none;
+      pointer-events: none;
+    }
+
+    ul#orderList li:not(.closed):active {
+      background-color: #e0f0ff;
+      box-shadow: 0 0 10px #66aaff;
+    }
+
+    ul#orderList li time {
+      font-size: 0.875rem;
+      color: #666;
+      margin-left: 1rem;
+      white-space: nowrap;
+    }
+
+    ul#orderList li > button {
+      all: unset;
+      cursor: pointer;
+      flex-grow: 1;
+      text-align: left;
+      font-size: inherit;
+      color: inherit;
+    }
+
+    ul#orderList li:focus-within {
+      outline: 2px solid #3399ff;
+      outline-offset: 2px;
+    }
+
+    .fade-out {
+      opacity: 0;
+      height: 0 !important;
+      margin: 0 !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      transition: opacity 0.8s ease, height 0.8s ease, margin 0.8s ease, padding 0.8s ease;
+    }
+  </style>
+</head>
+<body>
+  <h1>Production</h1>
+
+  <ul id="orderList" role="list"></ul>
+
+  <script>
+    const pendingRemovalOrders = new Set();
+    let articlesMap = {};
+
+    function onConfigLoaded(articles) {
+      articlesMap = {};
+      articles.forEach(a => {
+        articlesMap[a.id] = a.name;
+      });
+    }
+
+    function closeOrder(orderId) {
+      socket.emit('closeOrder', orderId);
+    }
+
+    function onStateUpdate(state) {
+      const list = document.getElementById('orderList');
+      list.innerHTML = '';
+
+      const sortedOrders = state.orders.slice().sort((a, b) => a.timestamp - b.timestamp);
+
+      sortedOrders.forEach(order => {
+        if (pendingRemovalOrders.has(order.id)) {
+          // Bestellung wird gerade ausgeblendet - nicht anzeigen
+          return;
+        }
+
+        const li = document.createElement('li');
+
+        li.style.height = "auto";
+        li.style.transition = "height 0.8s ease, opacity 0.8s ease, margin 0.8s ease, padding 0.8s ease";
+
+        if (order.closed) {
+          li.classList.add('closed');
+          li.textContent = `${articlesMap[order.articleId] || order.articleId}`;
+
+          const timeElem = document.createElement('time');
+          timeElem.dateTime = new Date(order.timestamp).toISOString();
+          timeElem.textContent = new Date(order.timestamp).toLocaleTimeString();
+          li.appendChild(timeElem);
+
+          // Keine automatische Entfernung hier - wird durch Server nach 5 Sekunden entfernt
+        } else {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = `${articlesMap[order.articleId] || order.articleId}`;
+          btn.onclick = () => {
+            markClosed(li, order);
+          };
+          li.appendChild(btn);
+
+          const timeElem = document.createElement('time');
+          timeElem.dateTime = new Date(order.timestamp).toISOString();
+          timeElem.textContent = new Date(order.timestamp).toLocaleTimeString();
+          li.appendChild(timeElem);
+        }
+        list.appendChild(li);
+      });
+    }
+
+    function markClosed(li, order) {
+      if (li.classList.contains('closed')) return;
+
+      li.classList.add('closed');
+      closeOrder(order.id);
+
+      const btn = li.querySelector('button');
+      if (btn) {
+        btn.disabled = true;
+        btn.style.cursor = 'default';
+      }
+
+      pendingRemovalOrders.add(order.id);
+
+      setTimeout(() => {
+        fadeOutAndRemove(li);
+        pendingRemovalOrders.delete(order.id);
+      }, 5000);
+    }
+
+    function fadeOutAndRemove(element) {
+      const height = element.offsetHeight + 'px';
+      element.style.height = height;
+      void element.offsetHeight; // Reflow
+
+      element.classList.add('fade-out');
+
+      element.addEventListener('transitionend', () => {
+        if (element.parentElement) {
+          element.parentElement.removeChild(element);
+        }
+      }, { once: true });
+    }
+  </script>
+</body>
+</html>

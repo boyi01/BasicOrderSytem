@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bestellung</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: #f4f6f8;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1, h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    #articles {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .article-card {
+      background-color: white;
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+      text-align: center;
+      width: 200px;
+    }
+
+    .article-card h3 {
+      margin: 0 0 12px 0;
+      font-size: 20px;
+    }
+
+    .article-card p {
+      margin: 8px 0 0;
+      font-size: 16px;
+      color: #666;
+    }
+
+    button {
+      padding: 12px 20px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      width: 100%;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    button:active {
+      background-color: #004494;
+    }
+
+    .status {
+      max-width: 400px;
+      margin: 30px auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    }
+
+    .status p {
+      font-size: 18px;
+      margin: 10px 0;
+    }
+
+    @media (max-width: 600px) {
+      .article-card {
+        width: 100%;
+      }
+
+      button {
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>🛒 Bestellung</h1>
+
+  <div>
+    <h2>Artikel auswählen</h2>
+    <div id="articles"></div>
+  </div>
+
+  <div class="status">
+    <h2>Gesamtstatus</h2>
+    <p>🛠️ In Produktion: <span id="inProduction">0</span></p>
+    <p>⏱️ Letzte 10 Sekunden: <span id="last10sec">0</span></p>
+  </div>
+
+  <script>
+    let articlesData = [];
+
+    function onConfigLoaded(articles) {
+      articlesData = articles;
+      const container = document.getElementById('articles');
+      container.innerHTML = '';
+
+      articles.forEach(a => {
+        const card = document.createElement('div');
+        card.className = 'article-card';
+        card.id = `article-${a.id}`;
+
+        const title = document.createElement('h3');
+        title.textContent = a.name;
+
+        const button = document.createElement('button');
+        button.textContent = 'Bestellen';
+        button.onclick = () => orderArticle(a.id);
+
+        const status = document.createElement('p');
+        status.id = `status-${a.id}`;
+        status.textContent = 'In Produktion: 0';
+
+        card.appendChild(title);
+        card.appendChild(button);
+        card.appendChild(status);
+
+        container.appendChild(card);
+      });
+    }
+
+    function onStateUpdate(state) {
+      document.getElementById('inProduction').textContent = state.inProduction;
+      document.getElementById('last10sec').textContent = state.last10sec;
+
+      if (state.articleProductionCount) {
+        articlesData.forEach(article => {
+          const count = state.articleProductionCount[article.id] || 0;
+          const statusEl = document.getElementById(`status-${article.id}`);
+          if (statusEl) {
+            statusEl.textContent = `In Produktion: ${count}`;
+          }
+        });
+      }
+    }
+  </script>
+</body>
+</html>
